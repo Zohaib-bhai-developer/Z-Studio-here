@@ -1,0 +1,249 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Z'Studio — AI Prompt UI</title>
+  <style>
+    :root{
+      --bg:#0f1724; --card:#0b1220; --accent:#6ee7b7; --accent-2:#7c3aed; --glass: rgba(255,255,255,0.04);
+      --glass-2: rgba(255,255,255,0.02);
+      --glass-3: rgba(255,255,255,0.06);
+      --radius:16px; --glass-border: rgba(255,255,255,0.06);
+      --mono: ui-monospace, SFMono-Regular, Menlo, Monaco, 'Roboto Mono', 'Courier New', monospace;
+    }
+    *{box-sizing:border-box}
+    html,body{height:100%}
+    body{
+      margin:0;
+      font-family: Inter, system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial;
+      background: radial-gradient(1200px 600px at 10% 10%, rgba(124,58,237,0.12), transparent 6%),
+                  radial-gradient(900px 500px at 90% 90%, rgba(34,211,238,0.06), transparent 6%),
+                  var(--bg);
+      color:#e6eef8;
+      -webkit-font-smoothing:antialiased;
+      -moz-osx-font-smoothing:grayscale;
+      padding:48px;
+      overflow-y:auto;
+    }
+
+    /* Big background watermark logo */
+    .watermark{
+      position:fixed; inset:0; pointer-events:none; z-index:0; display:flex; align-items:center; justify-content:center;
+      opacity:0.06; transform:scale(1.4);
+      font-weight:800; font-size:clamp(80px, 18vw, 240px); letter-spacing:6px; color:transparent;
+      -webkit-text-stroke: 1px rgba(255,255,255,0.06);
+      mix-blend-mode:screen;
+    }
+
+    /* Page frame */
+    .app{
+      position:relative; z-index:1; max-width:1200px; margin:0 auto; display:grid; gap:24px;
+      grid-template-columns: 1fr 420px; grid-auto-rows:min-content; align-items:start;
+    }
+
+    /* Header */
+    header{grid-column:1/-1; display:flex; gap:16px; align-items:center; justify-content:space-between}
+    .brand{display:flex; gap:12px; align-items:center}
+    .logo{
+      width:60px; height:60px; border-radius:14px; background:linear-gradient(135deg,var(--accent),var(--accent-2));
+      display:flex; align-items:center; justify-content:center; font-weight:800; color:#052018; font-family:var(--mono);
+      box-shadow: 0 8px 30px rgba(124,58,237,0.18), 0 2px 6px rgba(0,0,0,0.6);
+      transform:translateY(-2px);
+      animation: float 6s ease-in-out infinite;
+    }
+    @keyframes float{0%{transform:translateY(-2px)}50%{transform:translateY(6px)}100%{transform:translateY(-2px)}}
+    .brand h1{margin:0;font-size:18px;line-height:1}
+    .brand p{margin:0;font-size:12px;color:rgba(230,238,248,0.6)}
+
+    /* Left column - main controls */
+    .panel{background:linear-gradient(180deg,var(--glass), transparent); border-radius:var(--radius); padding:20px; border:1px solid var(--glass-border); box-shadow: 0 6px 30px rgba(2,6,23,0.6);}
+    .panel .title{font-size:14px; color:var(--accent); margin-bottom:12px; letter-spacing:1px}
+
+    /* Prompt box */
+    .prompt-box{display:flex; gap:12px; align-items:center}
+    textarea#prompt{flex:1; min-height:140px; resize:vertical; padding:14px; border-radius:12px; background:linear-gradient(180deg,var(--glass-2),transparent); border:1px solid rgba(255,255,255,0.03); color:inherit; font-size:15px}
+    .controls{display:flex; flex-direction:column; gap:12px; width:150px}
+    .btn{
+      display:inline-flex; align-items:center; justify-content:center; gap:8px; padding:12px 14px; border-radius:12px; border:0; color:#06231c; font-weight:700; cursor:pointer; background:linear-gradient(90deg,var(--accent),var(--accent-2)); box-shadow: 0 8px 24px rgba(124,58,237,0.18);
+      transition:transform .18s ease, box-shadow .18s ease; user-select:none;
+    }
+    .btn:active{transform:translateY(2px)}
+    .btn.ghost{background:transparent; color:var(--accent); font-weight:600; border:1px solid rgba(255,255,255,0.04)}
+
+    /* Small animated status */
+    .status{font-size:12px;color:rgba(230,238,248,0.7); display:flex; gap:8px; align-items:center}
+    .pulse{width:10px;height:10px;border-radius:999px;background:var(--accent); animation:pulse 1.6s infinite}
+    @keyframes pulse{0%{transform:scale(.8);opacity:0.8}50%{transform:scale(1.4);opacity:0.4}100%{transform:scale(.8);opacity:0.8}}
+
+    /* Right column - gallery */
+    .gallery-wrap{position:relative}
+    .gallery{display:grid; grid-template-columns:repeat(2,1fr); gap:14px; margin-top:6px}
+    .card{background:linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01)); padding:12px; border-radius:12px; min-height:120px; display:flex; flex-direction:column; gap:8px; border:1px solid rgba(255,255,255,0.03); overflow:hidden; position:relative}
+    .thumb{height:92px; border-radius:10px; background:linear-gradient(135deg, rgba(124,58,237,0.16), rgba(34,211,238,0.12)); display:flex; align-items:center; justify-content:center; font-weight:700; color:transparent; -webkit-text-stroke: .5px rgba(0,0,0,0.12)}
+    .meta{display:flex; gap:8px; align-items:center; justify-content:space-between}
+    .tag{font-size:12px; color:rgba(230,238,248,0.8); background:rgba(255,255,255,0.02); padding:6px 8px; border-radius:999px}
+    .empty{opacity:0.6; font-size:13px}
+
+    /* cute loading shimmer for thumb when generating */
+    .shimmer{animation:shine 1.6s linear infinite; background: linear-gradient(90deg, rgba(255,255,255,0.02) 0%, rgba(255,255,255,0.04) 50%, rgba(255,255,255,0.02) 100%); background-size:200% 100%}
+    @keyframes shine{0%{background-position:-150% 0}100%{background-position:150% 0}}
+
+    /* animations */
+    .fade-in{animation:fadeUp .5s cubic-bezier(.16,.8,.3,1) both}
+    @keyframes fadeUp{from{opacity:0; transform:translateY(8px)} to{opacity:1; transform:none}}
+
+    /* footer */
+    footer{grid-column:1/-1; text-align:center; font-size:13px; color:rgba(230,238,248,0.5); margin-top:6px}
+
+    /* responsive */
+    @media (max-width:980px){
+      .app{grid-template-columns:1fr; padding-bottom:120px}
+      .controls{width:100%; flex-direction:row}
+      .gallery{grid-template-columns:repeat(2,1fr)}
+    }
+    @media (max-width:560px){
+      .gallery{grid-template-columns:repeat(1,1fr)}
+    }
+  </style>
+</head>
+<body>
+  <div class="watermark">&lt; Z'Studio &gt;</div>
+  <div class="app">
+    <header>
+      <div class="brand">
+        <div class="logo">Z</div>
+        <div>
+          <h1>Z'Studio</h1>
+          <p>Interactive Prompt UI — clean, animated & responsive</p>
+        </div>
+      </div>
+      <div class="status">
+        <div class="pulse" aria-hidden></div>
+        <div>Ready — try a prompt and press <strong>Generate</strong></div>
+      </div>
+    </header>
+
+    <main class="panel fade-in">
+      <div class="title">Enter prompt</div>
+      <div class="prompt-box">
+        <textarea id="prompt" placeholder="Describe the image or scene you want (e.g. 'neon city at dusk, cinematic, 16:9')"></textarea>
+        <div class="controls">
+          <button id="generate" class="btn" title="Generate">Generate</button>
+          <button id="clear" class="btn ghost" title="Clear prompt">Clear</button>
+          <div style="display:flex;flex-direction:column;gap:6px">
+            <small style="color:rgba(230,238,248,0.6)">Style</small>
+            <select id="style" style="padding:8px;border-radius:10px;background:transparent;border:1px solid rgba(255,255,255,0.03);color:inherit">
+              <option>Photorealistic</option>
+              <option>Cinematic</option>
+              <option>Anime</option>
+              <option>Minimal</option>
+            </select>
+          </div>
+        </div>
+      </div>
+
+      <div style="margin-top:14px; display:flex; gap:12px; align-items:center;justify-content:space-between">
+        <div class="title">Preview</div>
+        <div style="font-size:12px;color:rgba(230,238,248,0.6)">Local demo — not connected to any AI</div>
+      </div>
+
+      <div id="livePreview" class="card" style="margin-top:12px; min-height:100px; display:flex; align-items:center; justify-content:center;">
+        <div class="empty">Your generated images will appear in the gallery to the right. Try: <em>"stormy mountain in purple light"</em></div>
+      </div>
+    </main>
+
+    <aside class="gallery-wrap">
+      <div class="panel fade-in">
+        <div class="title">Gallery</div>
+        <div style="display:flex;gap:8px;align-items:center;justify-content:space-between">
+          <div style="font-size:13px;color:rgba(230,238,248,0.7)">Saved results</div>
+          <div style="display:flex;gap:8px">
+            <button id="export" class="btn ghost">Export</button>
+            <button id="clearGallery" class="btn ghost">Clear</button>
+          </div>
+        </div>
+        <div id="gallery" class="gallery" style="margin-top:12px">
+          <!-- generated cards will be injected here -->
+        </div>
+      </div>
+    </aside>
+
+    <footer>Made with ❤️ — Z'Studio UI demo. Copy this file and open in a browser to preview.</footer>
+  </div>
+
+  <script>
+    const promptEl = document.getElementById('prompt');
+    const genBtn = document.getElementById('generate');
+    const clearBtn = document.getElementById('clear');
+    const gallery = document.getElementById('gallery');
+    const live = document.getElementById('livePreview');
+    const styleEl = document.getElementById('style');
+    const exportBtn = document.getElementById('export');
+    const clearGallery = document.getElementById('clearGallery');
+
+    function makeCard(promptText, style){
+      const card = document.createElement('div'); card.className='card fade-in';
+      const thumb = document.createElement('div'); thumb.className='thumb shimmer';
+      thumb.textContent = style.toUpperCase();
+      const meta = document.createElement('div'); meta.className='meta';
+      const tag = document.createElement('div'); tag.className='tag'; tag.textContent = new Date().toLocaleTimeString();
+      const title = document.createElement('div'); title.style.fontSize='13px'; title.style.opacity='0.95'; title.textContent = promptText.slice(0,60);
+      meta.appendChild(tag); meta.appendChild(title);
+      card.appendChild(thumb); card.appendChild(meta);
+
+      // small animation to simulate generation
+      setTimeout(()=>{
+        thumb.classList.remove('shimmer');
+        // create a faux generated image with an SVG data URL using prompt hash colors
+        const svg = `<svg xmlns='http://www.w3.org/2000/svg' width='800' height='450'><defs><linearGradient id='g' x1='0' x2='1'><stop offset='0' stop-color='%23${hashColor(promptText,0)}'/><stop offset='1' stop-color='%23${hashColor(promptText,1)}'/></linearGradient></defs><rect width='100%' height='100%' fill='url(%23g)'/><text x='50%' y='50%' alignment-baseline='middle' text-anchor='middle' font-size='36' font-family='Arial' fill='rgba(255,255,255,0.85)'>${escapeXml(promptText.slice(0,40))}</text></svg>`;
+        thumb.style.background='url("data:image/svg+xml;utf8,'+encodeURIComponent(svg)+'") center/cover no-repeat';
+        thumb.textContent='';
+      }, 900 + Math.random()*900);
+
+      return card;
+    }
+
+    function escapeXml(s){ return s.replace(/[&<>\"]+/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]||c)); }
+    function hashColor(s, idx){
+      // simple hash -> hex
+      let h=0; for(let i=0;i<s.length;i++){ h=(h<<5)-h + s.charCodeAt(i); h|=0 }
+      const a = (h>>idx*8)&0xFF; const b = (h>>((idx+1)*4))&0xFF; const c = (h>>((idx+2)*2))&0xFF;
+      return toHex(a)+toHex(b)+toHex(c);
+    }
+    function toHex(n){ return ('0'+(n&0xFF).toString(16)).slice(-2); }
+
+    genBtn.addEventListener('click', ()=>{
+      const prompt = promptEl.value.trim(); if(!prompt) { promptEl.focus(); promptEl.style.outline='2px solid rgba(124,58,237,0.25)'; setTimeout(()=>promptEl.style.outline='none',900); return }
+      // show in preview
+      live.innerHTML='';
+      const mini = document.createElement('div'); mini.className='thumb shimmer'; mini.style.width='100%'; mini.style.height='100%'; mini.textContent='Generating...';
+      live.appendChild(mini);
+
+      // simulate async generation and then insert into gallery
+      setTimeout(()=>{
+        live.innerHTML='';
+        const p = document.createElement('div'); p.style.fontSize='14px'; p.style.opacity='0.9'; p.textContent = `"${prompt}" — ${styleEl.value}`;
+        live.appendChild(p);
+
+        const card = makeCard(prompt, styleEl.value);
+        gallery.prepend(card);
+      }, 1100 + Math.random()*900);
+    });
+
+    clearBtn.addEventListener('click', ()=>{ promptEl.value=''; promptEl.focus(); });
+    clearGallery.addEventListener('click', ()=>{ gallery.innerHTML=''; });
+    exportBtn.addEventListener('click', ()=>{
+      // export JSON of gallery prompts
+      const items = Array.from(gallery.children).map(c=>({tag:c.querySelector('.tag')?.textContent, title:c.querySelector('.meta div:nth-child(2)')?.textContent}));
+      const blob = new Blob([JSON.stringify(items, null, 2)], {type:'application/json'});
+      const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href=url; a.download='zstudio-gallery.json'; a.click();
+      setTimeout(()=>URL.revokeObjectURL(url),2000);
+    });
+
+    // small UX: press ctrl+enter to generate
+    promptEl.addEventListener('keydown', (e)=>{ if(e.key==='Enter' && (e.ctrlKey||e.metaKey)){ genBtn.click(); }});
+
+  </script>
+</body>
+</html>
